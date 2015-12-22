@@ -3,6 +3,7 @@ package actions
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/Financial-Times/coco-alerting-system/rules"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -22,8 +23,8 @@ func NewSlackMessage(username string, emoji string, hook string) *SlackMessage {
 	return &SlackMessage{Username: username, IconEmoji: emoji, Hook: hook}
 }
 
-func (sm *SlackMessage) Execute(text string) string {
-	sm.Text = text
+func (sm *SlackMessage) Execute(rule rules.Rule, text string) string {
+	sm.Text = rule.Name + "\n" + text
 	marshalledPayload, err := json.Marshal(sm)
 	if err != nil {
 		panic(err)

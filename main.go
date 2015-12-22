@@ -3,8 +3,6 @@ package main
 import (
 	"os"
 
-	"time"
-
 	"encoding/json"
 	"flag"
 	"io"
@@ -14,7 +12,10 @@ import (
 	"github.com/Financial-Times/coco-alerting-system/actions"
 	"github.com/Financial-Times/coco-alerting-system/rules"
 	"github.com/Financial-Times/coco-alerting-system/sources"
+	"github.com/Financial-Times/coco-alerting-system/watchers"
 	"github.com/kr/pretty"
+	"os/signal"
+	"syscall"
 )
 
 const logPattern = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile | log.LUTC
@@ -22,16 +23,22 @@ const logPattern = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile | 
 var configFileName = flag.String("config", "", "Path to configuration file")
 var info *log.Logger
 var warn *log.Logger
-
 var sourceList []sources.Source
 
 type Config struct {
-	Slack SlackConfig `json:"slack"`
+	Slack         SlackConfig   `json:"slack"`
+	ElasticSearch ElasticSearch `json:"elastic"`
+	Rules         []rules.Rule  `json:"rules"`
 }
 type SlackConfig struct {
 	Username  string `json:"username"`
 	IconEmoji string `json:"emoji"`
 	Hook      string `json:"hook"`
+}
+
+type ElasticSearch struct {
+	Host   string `json:"host"`
+	Cookie string `json:"cookie"`
 }
 
 func main() {
@@ -45,37 +52,18 @@ func main() {
 		return
 	}
 
-	connParams := sources.ConnectionParams{
-		Url:      "http://yes",
-		User:     "foo",
-		Password: "bar",
-	}
-
-	elasticSource := sources.NewElasticSource(connParams)
-	splunkSource := sources.NewSplunkSource(connParams)
+	elasticSource := sources.NewElasticSource(appConfig.ElasticSearch.Host, appConfig.ElasticSearch.Cookie)
 	sourceList = append(sourceList, elasticSource)
-	sourceList = append(sourceList, splunkSource)
 
 	info.Printf("Using sources: %# v\n", pretty.Formatter(sourceList))
-
-	binaryIngesterErrors := rules.StringMatch{}
-	binaryIngesterErrors.
-		Named("bineryIngesterErrors").
-		InEnvironment("prod-us").
-		ForService("binary-ingester").
-		Earliest(10, time.Minute).
-		LatestNow().
-		MatchCountGreaterThan("error", 5)
-
-	info.Printf("Using rule: %# v\n", pretty.Formatter(binaryIngesterErrors))
-
-	action := actions.NewSendEmailAction("server", "recipient", "sender", "subject", "body")
-	info.Printf("Using action: %# v\n", pretty.Formatter(action))
-
 	slackMessage := actions.NewSlackMessage(appConfig.Slack.Username, appConfig.Slack.IconEmoji, appConfig.Slack.Hook)
-	actionResult := slackMessage.Execute("Demo message from app")
-	info.Printf("Result of slack message send: [%v]", actionResult)
-
+	watcher := watchers.StringMatchWatcher{}
+	for _, r := range appConfig.Rules {
+		go watcher.Watch(r, elasticSource, []actions.Action{slackMessage})
+	}
+	ch := make(chan os.Signal)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	<-ch
 }
 
 // ParseConfig opens the file at configFileName and unmarshals it into an AppConfig.

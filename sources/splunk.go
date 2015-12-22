@@ -2,14 +2,13 @@ package sources
 
 type (
 	splunkSource struct {
-		connectionParams ConnectionParams
 	}
 )
 
-func NewSplunkSource(connectionParams ConnectionParams) Source {
-	return &splunkSource{connectionParams: connectionParams}
+func NewSplunkSource() Source {
+	return &splunkSource{}
 }
 
-func (source *splunkSource) ExecuteQuery(query string) string {
-	return "this is the result for query: " + query
+func (source *splunkSource) Execute(query interface{}) *Result {
+	return &Result{0, "No results"}
 }

@@ -1,11 +1,10 @@
 package sources
 
 type Source interface {
-	ExecuteQuery(query string) string
+	Execute(query interface{}) *Result
 }
 
-type ConnectionParams struct {
-	Url      string
-	User     string
-	Password string
+type Result struct {
+	Hits int
+	Body string
 }

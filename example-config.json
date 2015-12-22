@@ -1,7 +1,56 @@
 {
-    "slack": {
-        "username": "foo",
-        "emoji": "bar",
-        "hook": "https://hooks.slack.com/services/raboof"
+  "slack": {
+    "username": "foo",
+    "emoji": "bar",
+    "hook": "https://hooks.slack.com/someHook"
+  },
+
+  "elastic": {
+    "host": "https://elk.ft.com",
+    "cookie": "authentication cookie"
+  },
+
+  "rules": [
+    {
+      "name": "Images failed to publish in under 2 minutes:",
+      "query": {
+        "fields": [
+          "uuid",
+          "transaction_id"
+        ],
+        "query": {
+          "bool": {
+            "must": [
+              {
+                "term": {
+                  "publishOk.raw": "false"
+                }
+              },
+              {
+                "regexp": {
+                  "environment": {
+                    "value": "prod.*"
+                  }
+                }
+              },
+              {
+                "term": {
+                  "platform.raw": "up-coco"
+                }
+              }
+            ]
+          }
+        },
+        "filter": {
+          "range": {
+            "@timestamp": {
+              "gt": "now-1h"
+            }
+          }
+        }
+      },
+      "interval": 60,
+      "threshold": 1
     }
+  ]
 }
