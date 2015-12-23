@@ -3,8 +3,6 @@ package watchers
 import (
 	"time"
 
-	"fmt"
-
 	"github.com/Financial-Times/coco-alerting-system/actions"
 	"github.com/Financial-Times/coco-alerting-system/rules"
 	"github.com/Financial-Times/coco-alerting-system/sources"
@@ -12,17 +10,14 @@ import (
 
 type StringMatchWatcher struct{}
 
-func (smw *StringMatchWatcher) Watch(rule rules.StringMatch, source sources.Source, actions []actions.Action) {
-	tickerChan := time.NewTicker(rule.Earliest)
+func (smw *StringMatchWatcher) Watch(rule rules.Rule, source sources.Source, actions []actions.Action) {
+	tickerChan := time.NewTicker(time.Duration(rule.Interval) * time.Minute)
 	for {
-		queryString := "Generate from rule - maybe the source can do this?"
-		result := source.ExecuteQuery(queryString)
-		//interpret result
-		fmt.Println(result)
-
-		for _, action := range actions {
-			//figure out what to send to the result
-			action.Execute(result)
+		result := source.Execute(rule.Query)
+		if result != nil && result.Hits >= rule.Threshold {
+			for _, action := range actions {
+				action.Execute(rule, result.Body)
+			}
 		}
 		select {
 		case <-tickerChan.C:
